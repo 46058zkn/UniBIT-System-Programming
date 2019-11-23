@@ -1,7 +1,7 @@
 /*
  * Курсова работа по "Системно програмиране" от Красимир Банчев, Фак. №46058зкн
  * Winsock 2.0 клиент/сървър приложение за мрежов чат
- * C++ Win32 конзолен сървър v. 0.9
+ * C++ Win32 API конзолен сървър v. 1.0
  */
 
 #ifndef UNICODE
@@ -19,6 +19,10 @@
 #include <fstream>
 
 using namespace std;
+
+#pragma optimize("a",on)
+#pragma comment(linker, "/STACK:2000000")
+#pragma comment(linker, "/HEAP:2000000")
 
 #pragma comment(lib, "ws2_32.lib" )
 #pragma comment(lib,"User32.lib")
@@ -38,7 +42,17 @@ int port = 0;
 unsigned int __stdcall  Server_Thread(void* p);
 static void Write_Log(wchar_t* log_filename, char* line);
 
-int _tmain(int argc, _TCHAR* argv[])
+/*
+ * Функцията wmain е основната в това конзолно приложение.
+ * Най-напред се определя текущия път от който е стартирано приложението, от
+ * който се изчислява местоположението на конфигурационния файл, от който
+ * сървъра разбира на кой ip адрес и порт трябва да "слуша" за клиентски конекции.
+ * По същия начин се оперира с местоположението на текстовия лог файл.
+ * Проверява се системата за наличие на съответната версия на winsock, при успех
+ * се създава сокет и се осъществява връзка със сървъра. При неуспех на всяка
+ * стъпка на конзолата се изписва съответното съобщение.
+ */
+int wmain(int argc, _TCHAR* argv[])
 {
     SetConsoleOutputCP(65001);
 
@@ -55,6 +69,12 @@ int _tmain(int argc, _TCHAR* argv[])
     GetCurrentDirectoryW(MAX_PATH, l_path);
     log_path = wcscat(l_path, log_filename);
 
+    /*
+     * Win32 API функциите GetPrivateProfileStringW и GetPrivateProfileIntW
+     * правят относително лесна работата с конфигурационни (.ini) файлове.
+     * Дават възможност за включване на дефолтна стойност, която да се
+     * използва при отсъствие на съответния файл.
+     */
     wchar_t addr[32];
     GetPrivateProfileStringW(_T("host"), _T("ip"), _T("127.0.0.1"), addr, sizeof(addr), ini_path);
     const _bstr_t _addr(addr);
@@ -107,6 +127,11 @@ int _tmain(int argc, _TCHAR* argv[])
         return 1;
     }
 
+    /*
+     * Проверките са приключили успешно и сървъра е готов за работа.
+     * На конзолата се изписва името на програмата, на кой адрес и порт
+     * очаква клиенти и пълните имена с пътя на конфигурационния и лог файловете.
+     */
     printf("Winsock чат сървър. Адрес: %s:%d\n", ip, port);
     printf("Конфигурационен файл: %ls\n", ini_path);
     printf("Лог файл: %ls\n\n", log_path);
@@ -128,8 +153,16 @@ int _tmain(int argc, _TCHAR* argv[])
         const char* empty = "";
         SecureZeroMemory(s_name[counter], 256);
 
+        /*
+         * В първото съобщение потребителя изпраща никнейма си, което
+         * в нашия случай се явява "регистрация" в чат системата.
+         */
         recv(server_connections[counter], s_name[counter], 256, NULL);
 
+        /*
+         * Ако съобщението не е празно, се съставя съобщение до потребителя,
+         * включващо и неговото име, което му се подава обратно.
+         */
         if (strcmp(s_name[counter], empty) != 0)
         {
             printf("%s влезе в системата\n", s_name[counter]);
@@ -146,6 +179,10 @@ int _tmain(int argc, _TCHAR* argv[])
 
             send(server_connections[counter], greeting, 256, NULL);
 
+            /*
+             * Тук се стартира сървърната нишка, която "слуша"
+             * на указаните адрес и порт за клиентски съобщения
+             */
             CreateThread(nullptr, 0, LPTHREAD_START_ROUTINE(Server_Thread), reinterpret_cast<void*>(counter), 0, nullptr);
             counter++;
         }
@@ -167,6 +204,14 @@ int _tmain(int argc, _TCHAR* argv[])
     return 0;
 }
 
+/*
+ * __stdcall създава нишката, която приема съобщенията на клиентите.
+ * В нея работи while, цикъл, който през 50ms проверява за нови събития.
+ * Той работи като ехо услуга. Клиентската програма визуализира на екран
+ * своите собствени съобщения едва след като ги е получила обратно от сървъра.
+ * Съобщенията се записват също така и във текстов лог файл и се изписват на
+ * конзолата на сървъра.
+ */
 unsigned int __stdcall Server_Thread(void* p)
 {
     int id = (int)p;
@@ -197,9 +242,15 @@ unsigned int __stdcall Server_Thread(void* p)
                 }
             }
         }
+
+        Sleep(50);
     }
 }
 
+/*
+ * Функцията "Write_Log" записва в текстов файл събития като "влизането"
+ * на потребител в "чата" и новопостъпилите съобщения на всички потребители
+ */
 static void Write_Log(wchar_t* log_filename, char* line)
 {
     strcat(line, "\n");

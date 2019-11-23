@@ -1,7 +1,7 @@
 /*
  * Курсова работа по "Системно програмиране" от Красимир Банчев, Фак. №46058зкн
  * Winsock 2.0 клиент/сървър приложение за мрежов чат
- * C++ Win32 API графичен клиент v. 0.9
+ * C++ Win32 API графичен клиент v. 1.0
  */
 
 #ifndef UNICODE
@@ -20,6 +20,7 @@
 #include <cwchar>
 #include <fstream>
 
+#pragma optimize("a",on)
 #pragma comment(linker, "/STACK:2000000")
 #pragma comment(linker, "/HEAP:2000000")
 
@@ -53,6 +54,11 @@ char* Convert_Outgoing_Message_To_MultiByte(wchar_t* message);
 wchar_t* Convert_Incoming_Message_To_WideChar(char* message);
 int Startup_Check();
 
+/*
+ * Създаване на инстанцията на приложението и на прозоречните класове.
+ * Ако проверките на функцията Startup_Check са преминали успешно,
+ * тук се стартира и нишката, "слушаща" за нови съобщения.
+ */
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	PWSTR lpCmdLine, int nCmdShow) {
 	MSG  sys_messages;
@@ -95,6 +101,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	return int(sys_messages.wParam);
 }
 
+/*
+ * "Логин" прозорец на програмата. Приема се вход с никнейма на потребителя.
+ * Прозореца не реагира на празен вход. След изчитане на въведеното от
+ * потребителя, то се подава на сървъра за "регистрация" и на функцията
+ * Set_Username_To_Window_Title, а прозореца се затваря. Ако всичко е наред,
+ * bool глобалната променлива username_success се сетва на true
+ *
+ */
 LRESULT CALLBACK LoginWndProc(HWND hWnd, UINT msg,
 	WPARAM wParam, LPARAM lParam) {
 	PAINTSTRUCT ps;
@@ -152,7 +166,7 @@ LRESULT CALLBACK LoginWndProc(HWND hWnd, UINT msg,
 					closesocket(client_connect);
 					WSACleanup();
 					socket_success = false;
-					return WSAGetLastError();
+					return 1;
 				}
 
 				username_success = true;
@@ -171,6 +185,13 @@ LRESULT CALLBACK LoginWndProc(HWND hWnd, UINT msg,
 	return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
+/*
+ * Основен прозорец на приложението. Тук се визуализира "чат диалога" и се
+ * обработва потребителският вход. Съдържа два текстови контрола и един бутон.
+ * Написаното от потребителя, което нативно е wchar_t се подава на функцията
+ * Convert_Outgoing_Message_To_MultiByte за да се преобразува в char, след което
+ * се изпраща към сървъра
+ */
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
 	WPARAM wParam, LPARAM lParam) {
 	PAINTSTRUCT ps;
@@ -255,6 +276,17 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
 	return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
+/*
+ * Функцията Startup_Check подготвя програмата за началото на нейната работа.
+ * Най-напред се определя текущия път от който е стартирано приложението, от
+ * който се изчислява местоположението на конфигурационния файл. След парсване
+ * на същия клиента разбира на кой ip адрес и порт трябва да търси сървъра си.
+ * Проверява се системата за наличие на съответната версия на winsock, при успех
+ * се създава сокет и се осъществява връзка със сървъра. При неуспех на всяка
+ * стъпка на потребителя се показва MessageBox със съответното съобщение.
+ * При успех двете глобални bool променливи network_success и
+ * socket_success се сетват на true.
+ */
 int Startup_Check()
 {
 	const wchar_t* filename = _T("\\Client.ini");
@@ -309,6 +341,13 @@ int Startup_Check()
 	return 0;
 }
 
+/*
+ * __stdcall създава отделна нишка, в която се върти постоянно while цикъл,
+ * който проверява през 50 милисекунди за новопристигнали съобщения. Те се
+ * подават на функцията Convert_Incoming_Message_To_WideChar за конвертиране
+ * в wchar_t, след което се препредават на функция Append_New_Message_To_Chat,
+ * която ги "залепва" под вече съществуващите записи в графичния интерфейс.
+ */
 unsigned int __stdcall Client_Thread(void*)
 {
 	char* buffer = new char[256]{ 0 };
@@ -326,6 +365,13 @@ unsigned int __stdcall Client_Thread(void*)
 	}
 }
 
+/*
+ * Функцията Set_Username_To_Window_Title "залепва" името на потребителя
+ * към името на приложението в заглавния ред на прозореца му. Освен това
+ * новополучения текстов низ се запазва в глобална променлива, която се
+ * използва за откриване на нужния прозорец от функцията, която пише по
+ * текстовия контрол /Append_New_Message_To_Chat/
+ */
 void Set_Username_To_Window_Title(wchar_t* new_title)
 {
 	const HWND& hwnd = FindWindowExW(nullptr, nullptr, _T("MainWindow"), nullptr);
@@ -342,6 +388,11 @@ void Set_Username_To_Window_Title(wchar_t* new_title)
 	SetWindowTextW(hwnd, text);
 }
 
+/*
+ * Функцията Convert_Outgoing_Message_To_MultiByte преобразува
+ * изходящите съобщения от wchar_t в char, за да може да преминат
+ * през winsock.
+ */
 char* Convert_Outgoing_Message_To_MultiByte(wchar_t* message)
 {
 	char* multi_byte = new char[256];
@@ -353,6 +404,11 @@ char* Convert_Outgoing_Message_To_MultiByte(wchar_t* message)
 	return multi_byte;
 }
 
+/*
+ * Функцията Convert_Incoming_Message_To_WideChar преобразува
+ * входящите съобщения от char в wchar_t, за да може да бъдат
+ * изведени коректно в текстовия контрол.
+ */
 wchar_t* Convert_Incoming_Message_To_WideChar(char* message)
 {
 	strcat(message, "\r\n");
@@ -366,13 +422,23 @@ wchar_t* Convert_Incoming_Message_To_WideChar(char* message)
 	return wide_chars;
 }
 
+/*
+ * Функцията Append_New_Message_To_Chat "залепва" новоприетите съобщения
+ * под вече пристигналите в текстовия контрол с ID_EDITCHILD1 101.
+ * Открива се нужния прозорец по името на неговия прозоречен клас и
+ * и неговия WindowTite. Изчита се съществуващото съдържание на текстовия
+ * контрол, изичислява се неговата дължина плюс тази на новото съобщение,
+ * създава се буфер със съответния размер, в него се записва съдържанието
+ * на прозореца в момента, към буфера се долепва новото съобщение и всичко
+ * се подава към текстовия контрол като WindowText чрез SetWindowTextW.
+ */
 void Append_New_Message_To_Chat(wchar_t* new_text)
 {
 	const HWND& hwnd = FindWindowExW(nullptr, nullptr, _T("MainWindow"), main_window_title);
 
-	HWND hwnd_output = GetDlgItem(hwnd, ID_EDITCHILD1);
+	const HWND& hwnd_output = GetDlgItem(hwnd, ID_EDITCHILD1);
 
-	int out_length = GetWindowTextLengthW(hwnd_output) + lstrlenW(new_text) + 1;
+	const int out_length = GetWindowTextLengthW(hwnd_output) + lstrlenW(new_text) + 1;
 
 	std::vector<wchar_t> buf(out_length);
 	wchar_t* pbuf = &buf[0];
