@@ -56,7 +56,7 @@ int Startup_Check();
 
 /*
  * Създаване на инстанцията на приложението и на прозоречните класове.
- * Ако проверките на функцията Startup_Check са преминали успешно,
+ * Ако проверките на функцията "Startup_Check" са преминали успешно,
  * тук се стартира и нишката, "слушаща" за нови съобщения.
  */
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
@@ -105,7 +105,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
  * "Логин" прозорец на програмата. Приема се вход с никнейма на потребителя.
  * Прозореца не реагира на празен вход. След изчитане на въведеното от
  * потребителя, то се подава на сървъра за "регистрация" и на функцията
- * Set_Username_To_Window_Title, а прозореца се затваря. Ако всичко е наред,
+ * "Set_Username_To_Window_Title", а прозореца се затваря. Ако всичко е наред,
  * bool глобалната променлива username_success се сетва на true
  *
  */
@@ -189,7 +189,7 @@ LRESULT CALLBACK LoginWndProc(HWND hWnd, UINT msg,
  * Основен прозорец на приложението. Тук се визуализира "чат диалога" и се
  * обработва потребителският вход. Съдържа два текстови контрола и един бутон.
  * Написаното от потребителя, което нативно е wchar_t се подава на функцията
- * Convert_Outgoing_Message_To_MultiByte за да се преобразува в char, след което
+ * "Convert_Outgoing_Message_To_MultiByte" за да се преобразува в char, след което
  * се изпраща към сървъра
  */
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
@@ -277,7 +277,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
 }
 
 /*
- * Функцията Startup_Check подготвя програмата за началото на нейната работа.
+ * Функцията "Startup_Check" подготвя програмата за началото на нейната работа.
  * Най-напред се определя текущия път от който е стартирано приложението, от
  * който се изчислява местоположението на конфигурационния файл. След парсване
  * на същия клиента разбира на кой ip адрес и порт трябва да търси сървъра си.
@@ -342,10 +342,10 @@ int Startup_Check()
 }
 
 /*
- * __stdcall създава отделна нишка, в която се върти постоянно while цикъл,
- * който проверява през 50 милисекунди за новопристигнали съобщения. Те се
- * подават на функцията Convert_Incoming_Message_To_WideChar за конвертиране
- * в wchar_t, след което се препредават на функция Append_New_Message_To_Chat,
+ * "Client_Thread" създава отделна нишка, в която се върти постоянно while цикъл,
+ * който проверява през 100 милисекунди за новопристигнали съобщения. Те се
+ * подават на функцията "Convert_Incoming_Message_To_WideChar" за конвертиране
+ * в wchar_t, след което се препредават на функция "Append_New_Message_To_Chat",
  * която ги "залепва" под вече съществуващите записи в графичния интерфейс.
  */
 unsigned int __stdcall Client_Thread(void*)
@@ -361,16 +361,16 @@ unsigned int __stdcall Client_Thread(void*)
 			wchar_t* msg = Convert_Incoming_Message_To_WideChar(buffer);
 			Append_New_Message_To_Chat(msg);
 		}
-		Sleep(50);
+		Sleep(100);
 	}
 }
 
 /*
- * Функцията Set_Username_To_Window_Title "залепва" името на потребителя
+ * Функцията "Set_Username_To_Window_Title" "залепва" името на потребителя
  * към името на приложението в заглавния ред на прозореца му. Освен това
  * новополучения текстов низ се запазва в глобална променлива, която се
  * използва за откриване на нужния прозорец от функцията, която пише по
- * текстовия контрол /Append_New_Message_To_Chat/
+ * текстовия контрол /"Append_New_Message_To_Chat"/
  */
 void Set_Username_To_Window_Title(wchar_t* new_title)
 {
@@ -389,7 +389,7 @@ void Set_Username_To_Window_Title(wchar_t* new_title)
 }
 
 /*
- * Функцията Convert_Outgoing_Message_To_MultiByte преобразува
+ * Функцията "Convert_Outgoing_Message_To_MultiByte" преобразува
  * изходящите съобщения от wchar_t в char, за да може да преминат
  * през winsock.
  */
@@ -405,7 +405,7 @@ char* Convert_Outgoing_Message_To_MultiByte(wchar_t* message)
 }
 
 /*
- * Функцията Convert_Incoming_Message_To_WideChar преобразува
+ * Функцията "Convert_Incoming_Message_To_WideChar" преобразува
  * входящите съобщения от char в wchar_t, за да може да бъдат
  * изведени коректно в текстовия контрол.
  */
@@ -423,7 +423,7 @@ wchar_t* Convert_Incoming_Message_To_WideChar(char* message)
 }
 
 /*
- * Функцията Append_New_Message_To_Chat "залепва" новоприетите съобщения
+ * Функцията "Append_New_Message_To_Chat" "залепва" новоприетите съобщения
  * под вече пристигналите в текстовия контрол с ID_EDITCHILD1 101.
  * Открива се нужния прозорец по името на неговия прозоречен клас и
  * и неговия WindowTite. Изчита се съществуващото съдържание на текстовия
