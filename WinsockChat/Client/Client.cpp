@@ -20,6 +20,9 @@
 #include <cwchar>
 #include <fstream>
 
+#pragma comment(linker, "/STACK:2000000")
+#pragma comment(linker, "/HEAP:2000000")
+
 #pragma comment(lib, "ws2_32.lib" )
 #pragma comment(lib,"User32.lib")
 #pragma warning(disable : 4996)
@@ -40,12 +43,14 @@ int port = 0;
 bool network_success = false;
 bool socket_success = false;
 bool username_success = false;
+const wchar_t* main_window_title = nullptr;
 unsigned int __stdcall  Client_Thread(void* p);
 LRESULT CALLBACK MainWndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK LoginWndProc(HWND, UINT, WPARAM, LPARAM);
 void Append_New_Message_To_Chat(wchar_t* new_text);
 void Set_Username_To_Window_Title(wchar_t* new_title);
-wchar_t* Convert_Message_To_Unicode(char* message);
+char* Convert_Outgoing_Message_To_MultiByte(wchar_t* message);
+wchar_t* Convert_Incoming_Message_To_WideChar(char* message);
 int Startup_Check();
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
@@ -56,18 +61,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	main_window_class.hInstance = hInstance;
 	main_window_class.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
 	main_window_class.lpfnWndProc = MainWndProc;
-	main_window_class.hCursor = LoadCursor(0, IDC_ARROW);
+	main_window_class.hCursor = LoadCursor(nullptr, IDC_ARROW);
 
 	RegisterClassW(&main_window_class);
 	CreateWindowW(main_window_class.lpszClassName, L"Winsock Чат клиент",
 		WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
-		120, 120, 597, 500, 0, 0, hInstance, 0);
+		120, 120, 597, 500, nullptr, nullptr, hInstance, nullptr);
 
 	Startup_Check();
 
 	if (network_success == true && socket_success == true)
 	{
-		CreateThread(0, 0, LPTHREAD_START_ROUTINE(Client_Thread), 0, 0, 0);
+		CreateThread(nullptr, 0, LPTHREAD_START_ROUTINE(Client_Thread), nullptr, 0, nullptr);
 	}
 
 	WNDCLASSW login_windows_class = { 0 };
@@ -75,14 +80,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	login_windows_class.hInstance = hInstance;
 	login_windows_class.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
 	login_windows_class.lpfnWndProc = LoginWndProc;
-	login_windows_class.hCursor = LoadCursor(0, IDC_ARROW);
+	login_windows_class.hCursor = LoadCursor(nullptr, IDC_ARROW);
 
 	RegisterClassW(&login_windows_class);
 	CreateWindow(login_windows_class.lpszClassName, L"Как се казвате?",
 		WS_CAPTION | WS_VISIBLE | WS_POPUP,
-		270, 290, 270, 100, 0, 0, hInstance, 0);
+		270, 290, 270, 100, nullptr, nullptr, hInstance, nullptr);
 
-	while (GetMessage(&sys_messages, NULL, 0, 0)) {
+	while (GetMessage(&sys_messages, nullptr, 0, 0)) {
 		TranslateMessage(&sys_messages);
 		DispatchMessage(&sys_messages);
 	}
@@ -143,7 +148,7 @@ LRESULT CALLBACK LoginWndProc(HWND hWnd, UINT msg,
 
 				if (c_result == SOCKET_ERROR)
 				{
-					MessageBoxW(NULL, _T("Сървърът е недостъпен!"), _T("Грешка при свързване!"), MB_ICONERROR | MB_OK);
+					MessageBoxW(nullptr, _T("Сървърът е недостъпен!"), _T("Грешка при свързване!"), MB_ICONERROR | MB_OK);
 					closesocket(client_connect);
 					WSACleanup();
 					socket_success = false;
@@ -151,7 +156,9 @@ LRESULT CALLBACK LoginWndProc(HWND hWnd, UINT msg,
 				}
 
 				username_success = true;
+
 				Set_Username_To_Window_Title(text);
+
 				DestroyWindow(hWnd);
 			}
 		}
@@ -185,7 +192,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
 		break;
 
 	case WM_CREATE:
-		hwnd_messages = CreateWindowW(L"Edit", NULL,
+		hwnd_messages = CreateWindowW(L"Edit", L"ChatBox",
 			WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_BORDER |
 			ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL,
 			5, 30, 571, 400, hwnd, (HMENU)ID_EDITCHILD1,
@@ -209,23 +216,19 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
 		if (HIWORD(wParam) == BN_CLICKED) {
 			if (network_success == true && socket_success == true && username_success == true)
 			{
-				char* chat_msg = new char[256];
-				SecureZeroMemory(chat_msg, 256);
-
 				const int len = GetWindowTextLengthW(hwnd_edit) + 1;
 				wchar_t* const text = new wchar_t[len];
 				GetWindowTextW(hwnd_edit, text, len);
 
 				const char* empty = "";
-				const _bstr_t _msg(text);
-				chat_msg = _msg;
+				char* chat_msg = Convert_Outgoing_Message_To_MultiByte(text);
 
 				if (strcmp(chat_msg, empty) != 0)
 				{
 					c_result = send(client_connect, chat_msg, 256, NULL);
 					if (c_result == SOCKET_ERROR)
 					{
-						MessageBoxW(NULL, _T("Не може да бъде изпратено съобщение!"), _T("Грешка при изпращане!"), MB_ICONERROR | MB_OK);
+						MessageBoxW(nullptr, _T("Не може да бъде изпратено съобщение!"), _T("Грешка при изпращане!"), MB_ICONERROR | MB_OK);
 						closesocket(client_connect);
 						WSACleanup();
 						return 1;
@@ -236,7 +239,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
 			}
 			else
 			{
-				MessageBoxW(NULL, _T("Проверете сървъра и рестартирайте програмата!"), _T("Системна грешка!"), MB_ICONERROR | MB_OK);
+				MessageBoxW(nullptr, _T("Проверете сървъра и рестартирайте програмата!"), _T("Системна грешка!"), MB_ICONERROR | MB_OK);
 			}
 		}
 
@@ -277,7 +280,7 @@ int Startup_Check()
 
 	if (c_result)
 	{
-		MessageBoxW(NULL, _T("Winsock липсва или е стара версия!"), _T("Грешка!"), MB_ICONWARNING | MB_OK);
+		MessageBoxW(nullptr, _T("Winsock липсва или е стара версия!"), _T("Грешка!"), MB_ICONWARNING | MB_OK);
 		network_success = false;
 		return 1;
 	}
@@ -286,7 +289,7 @@ int Startup_Check()
 
 	if (client_connect == INVALID_SOCKET)
 	{
-		MessageBoxW(NULL, _T("Невалиден сокет!"), _T("Грешка!"), MB_ICONWARNING | MB_OK);
+		MessageBoxW(nullptr, _T("Невалиден сокет!"), _T("Грешка!"), MB_ICONWARNING | MB_OK);
 		WSACleanup();
 		network_success = false;
 		return 1;
@@ -295,7 +298,7 @@ int Startup_Check()
 	c_result = connect(client_connect, reinterpret_cast<SOCKADDR*>(&c_address), sizeof(sockaddr_in));
 	if (c_result)
 	{
-		MessageBoxW(NULL, _T("Сървърът е недостъпен!"), _T("Грешка при свързване!"), MB_ICONERROR | MB_OK);
+		MessageBoxW(nullptr, _T("Сървърът е недостъпен!"), _T("Грешка при свързване!"), MB_ICONERROR | MB_OK);
 		closesocket(client_connect);
 		WSACleanup();
 		network_success = false;
@@ -316,7 +319,7 @@ unsigned int __stdcall Client_Thread(void*)
 		SecureZeroMemory(buffer, 256);
 		if ((size = recv(client_connect, buffer, 256, NULL) > 0))
 		{
-			wchar_t* msg = Convert_Message_To_Unicode(buffer);
+			wchar_t* msg = Convert_Incoming_Message_To_WideChar(buffer);
 			Append_New_Message_To_Chat(msg);
 		}
 		Sleep(50);
@@ -325,7 +328,7 @@ unsigned int __stdcall Client_Thread(void*)
 
 void Set_Username_To_Window_Title(wchar_t* new_title)
 {
-	const HWND& hwnd = FindWindowExW(NULL, NULL, _T("MainWindow"), NULL);
+	const HWND& hwnd = FindWindowExW(nullptr, nullptr, _T("MainWindow"), nullptr);
 
 	const int len = GetWindowTextLengthW(hwnd) + 1;
 	wchar_t* text = new wchar_t[len];
@@ -335,26 +338,37 @@ void Set_Username_To_Window_Title(wchar_t* new_title)
 	const wchar_t* delimiter = L" | Потребител: ";
 	text = wcscat(text, delimiter);
 	text = wcscat(text, new_title);
-
+	main_window_title = text;
 	SetWindowTextW(hwnd, text);
 }
 
-wchar_t* Convert_Message_To_Unicode(char* message)
+char* Convert_Outgoing_Message_To_MultiByte(wchar_t* message)
+{
+	char* multi_byte = new char[256];
+
+	const int wide_chars_number = WideCharToMultiByte(CP_UTF8, 0, message, -1, nullptr, 0, nullptr, nullptr);
+
+	WideCharToMultiByte(CP_UTF8, 0, message, -1, multi_byte, wide_chars_number, nullptr, nullptr);
+
+	return multi_byte;
+}
+
+wchar_t* Convert_Incoming_Message_To_WideChar(char* message)
 {
 	strcat(message, "\r\n");
 
-	const int chars_num = MultiByteToWideChar(CP_UTF8, 0, message, -1, NULL, 0);
+	const int chars_number = MultiByteToWideChar(CP_UTF8, UNICODE, message, -1, nullptr, 0);
 
-	wchar_t* wide_chars = new wchar_t[chars_num];
+	wchar_t* wide_chars = new wchar_t[chars_number];
 
-	MultiByteToWideChar(CP_UTF8, UNICODE, message, -1, wide_chars, chars_num);
+	MultiByteToWideChar(CP_UTF8, UNICODE, message, -1, wide_chars, chars_number);
 
 	return wide_chars;
 }
 
 void Append_New_Message_To_Chat(wchar_t* new_text)
 {
-	const HWND& hwnd = FindWindowExW(NULL, NULL, _T("MainWindow"), NULL);
+	const HWND& hwnd = FindWindowExW(nullptr, nullptr, _T("MainWindow"), main_window_title);
 
 	HWND hwnd_output = GetDlgItem(hwnd, ID_EDITCHILD1);
 

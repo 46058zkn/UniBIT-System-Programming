@@ -113,7 +113,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
     server_connections = static_cast<SOCKET*>(calloc(64, sizeof(SOCKET)));
 
-    while ((server_socket = accept(server_connect, 0, 0)))
+    while ((server_socket = accept(server_connect, nullptr, nullptr)))
     {
         if (server_socket == INVALID_SOCKET)
         {
@@ -146,7 +146,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
             send(server_connections[counter], greeting, 256, NULL);
 
-            CreateThread(0, 0, LPTHREAD_START_ROUTINE(Server_Thread), reinterpret_cast<void*>(counter), 0, 0);
+            CreateThread(nullptr, 0, LPTHREAD_START_ROUTINE(Server_Thread), reinterpret_cast<void*>(counter), 0, nullptr);
             counter++;
         }
     }
@@ -211,10 +211,10 @@ static void Write_Log(wchar_t* log_filename, char* line)
     HANDLE log_file = CreateFileW(log_filename,
         FILE_APPEND_DATA,
         FILE_SHARE_READ,
-        NULL,
+        nullptr,
         OPEN_ALWAYS,
         FILE_ATTRIBUTE_NORMAL,
-        NULL);
+        nullptr);
 
     if (log_file == INVALID_HANDLE_VALUE)
     {
@@ -223,7 +223,7 @@ static void Write_Log(wchar_t* log_filename, char* line)
 
     while (dw_bytes_to_write > 0)
     {
-        before_error_flag = WriteFile(log_file, line, dw_bytes_to_write, &dw_bytes_written, NULL);
+        before_error_flag = WriteFile(log_file, line, dw_bytes_to_write, &dw_bytes_written, nullptr);
 
         if (!before_error_flag)
         {
